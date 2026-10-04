@@ -31,6 +31,11 @@ architecture and known-issues records, and git rules for coding agents
    branch from `main` and push both.
 2. Run `sh scripts/setup.sh` (or `scripts/setup.ps1` on Windows) to enable
    the git hooks. Claude Code does this automatically at session start.
+   On Windows, git does not record the executable bit: when adding a new
+   hook or script, run
+   `git update-index --chmod=+x <file>` before committing (`scripts/setup.ps1`
+   does this for the shipped ones), otherwise Linux/macOS clones and CI
+   skip the hook.
 3. Fill in every `SETUP` marker: `grep -rn SETUP --exclude-dir=.git .`
    - REQUIREMENTS-MANAGEMENT.md: project name, area codes, code/test roots,
      ground-truth sources (§8).

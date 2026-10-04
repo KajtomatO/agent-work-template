@@ -29,6 +29,21 @@ expect() { # expect ok|blocked "description" command...
     fi
 }
 
+echo "hook files"
+# Git silently skips non-executable hooks on Linux/macOS; Windows commits
+# lose the bit unless it is set with `git update-index --chmod=+x`.
+for h in "$hooks"/*; do
+    case "$h" in */_*) continue ;; esac
+    mode=$(git -C "$hooks" ls-files -s "$(basename "$h")" | cut -d' ' -f1)
+    if [ "$mode" = "100755" ]; then
+        pass=$((pass + 1)); echo "  ok    $(basename "$h") is executable in git"
+    else
+        fail=$((fail + 1))
+        echo "  FAIL  $(basename "$h") has mode ${mode:-untracked}, not 100755 —" \
+             "run: git update-index --chmod=+x .githooks/$(basename "$h")"
+    fi
+done
+
 n=0
 change() { n=$((n + 1)); echo "$n" > f.txt; git add f.txt; }
 
