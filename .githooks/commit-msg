@@ -1,0 +1,22 @@
+#!/bin/sh
+# Agent commit messages: short subject, no reference to the agent or tooling.
+. "$(dirname "$0")/_agent.sh"
+
+is_agent || exit 0
+
+# Message as git will store it: drop the verbose-diff part and comment lines.
+msg=$(sed -e '/^# -\{24\} >8 -\{24\}/,$d' -e '/^#/d' "$1")
+subject=$(printf '%s\n' "$msg" | sed -n '/[^[:space:]]/{p;q;}')
+
+[ -n "$subject" ] || deny "empty commit message."
+
+len=$(printf '%s' "$subject" | wc -m | tr -d ' ')
+if [ "$len" -gt "$MAX_SUBJECT_LEN" ]; then
+    deny "subject is $len characters; keep it at most $MAX_SUBJECT_LEN."
+fi
+
+hit=$(printf '%s\n' "$msg" | grep -inE "$FORBIDDEN_MSG_RE" | head -n 1)
+if [ -n "$hit" ]; then
+    deny "commit message must not refer to the agent or tooling (line $hit)."
+fi
+exit 0

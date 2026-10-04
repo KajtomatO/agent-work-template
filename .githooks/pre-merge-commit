@@ -1,0 +1,13 @@
+#!/bin/sh
+# Agents may not merge into protected branches.
+# Note: fast-forward merges create no commit and do not run this hook —
+# server-side branch protection covers that gap (docs/GIT-WORKFLOW.md).
+. "$(dirname "$0")/_agent.sh"
+
+is_agent || exit 0
+
+branch=$(current_branch)
+if is_protected "$branch"; then
+    deny "agent merges into '$branch' are not allowed. A human merges via PR."
+fi
+exit 0

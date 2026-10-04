@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Developer task runner — a thin, optional wrapper over the same commands CI
+# runs. Never required: the plain commands it echoes keep working.
+# implements: REQ-BUILD-001
+#
+# SETUP: fill in the cmd_* functions below with this project's commands and
+# remove the `todo` calls. Keep `ci` mirroring .github/workflows/ci.yml.
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd "$ROOT"
+
+log()  { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
+warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
+die()  { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+run()  { printf '\033[2m$ %s\033[0m\n' "$*" >&2; "$@"; }   # echo, then execute
+todo() { die "'$1' is not configured yet — edit ./dev (SETUP)"; }
+
+# Local, git-ignored settings and secrets (see .env.example).
+if [[ -f "$ROOT/.env" ]]; then
+    log "loading .env"
+    set -a; source "$ROOT/.env"; set +a
+fi
+
+cmd_setup() {
+    run sh scripts/setup.sh
+}
+
+cmd_build() {
+    todo build                                   # e.g. run <build command>
+}
+
+cmd_test() {
+    local tier=${1:-unit}
+    case "$tier" in
+        unit|integration|disruptive|all) ;;
+        *) die "unknown test tier '$tier' (unit|integration|disruptive|all)" ;;
+    esac
+    todo "test $tier"                            # e.g. run <test command> --tier "$tier"
+}
+
+cmd_check() {
+    todo check                                   # lint, format check, doc gates
+}
+
+cmd_ci() {
+    # Local mirror of CI: same steps, same order.
+    run sh scripts/test-hooks.sh
+    cmd_build
+    cmd_check
+    cmd_test unit
+}
+
+cmd_help() {
+    cat <<'EOF'
+usage: ./dev <command> [args]
+
+  setup                  enable git hooks (idempotent)
+  build                  build the project
+  test [tier]            run tests: unit (default) | integration | disruptive | all
+  check                  static checks: lint, formatting, documentation gates
+  ci                     run what CI runs, locally
+  help                   this text
+
+Loads ./.env (git-ignored) if present.
+EOF
+}
+
+cmd=${1:-help}
+shift || true
+case "$cmd" in
+    setup|build|test|check|ci|help) "cmd_$cmd" "$@" ;;
+    -h|--help) cmd_help ;;
+    *) cmd_help; die "unknown command '$cmd'" ;;
+esac

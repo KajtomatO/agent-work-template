@@ -1,0 +1,33 @@
+# implements: REQ-BUILD-001, REQ-BUILD-002
+# Keep in sync with `./dev ci` (the local mirror of this workflow).
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hooks:
+    name: git hooks self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh scripts/test-hooks.sh
+
+  build-test:
+    name: build & unit tests
+    # SETUP: remove this condition once ./dev build/check/test are configured,
+    # and add an OS/toolchain matrix as needed.
+    if: ${{ vars.DEV_CONFIGURED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # SETUP: toolchain / dependency installation steps go here.
+      - run: ./dev build
+      - run: ./dev check
+      - run: ./dev test unit

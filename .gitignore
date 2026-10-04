@@ -1,0 +1,21 @@
+# Local settings and secrets
+.env
+*.local.env
+.claude/settings.local.json
+
+# Scratch
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+
+# SETUP: add language/toolchain ignores below (build outputs, dependencies).

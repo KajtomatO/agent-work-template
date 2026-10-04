@@ -1,0 +1,31 @@
+#!/bin/sh
+# Agent pushes:
+#   - never to a protected branch (any session, any approval);
+#   - otherwise only when the user explicitly asked (AGENT_PUSH_APPROVED=1),
+#     or in a cloud session for branches the agent created (CLOUD_BRANCH_PREFIX).
+. "$(dirname "$0")/_agent.sh"
+
+is_agent || exit 0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$remote_ref" in
+        refs/heads/*) name=${remote_ref#refs/heads/} ;;
+        *)            name=$remote_ref ;;
+    esac
+
+    if is_protected "$name"; then
+        deny "agents may not push to '$name'."
+    fi
+
+    [ "${AGENT_PUSH_APPROVED:-}" = "1" ] && continue
+
+    if is_cloud; then
+        case "$remote_ref" in
+            "refs/heads/$CLOUD_BRANCH_PREFIX"*) continue ;;
+        esac
+        deny "cloud session: agents may only push '$CLOUD_BRANCH_PREFIX*' branches ('$name' refused)."
+    fi
+
+    deny "agents push only when the user explicitly asks ('$name' refused)."
+done
+exit 0
