@@ -1,0 +1,12 @@
+#!/bin/sh
+# Agents may not commit on protected branches. Same rule as pre-commit, for
+# the commands that skip it: cherry-pick, revert and `commit --no-verify`.
+. "$(dirname "$0")/_agent.sh"
+
+is_agent || exit 0
+
+branch=$(current_branch)
+if is_protected "$branch"; then
+    deny "agent commits on '$branch' are not allowed. Work on another branch."
+fi
+exit 0

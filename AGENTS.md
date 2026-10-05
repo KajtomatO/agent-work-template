@@ -23,27 +23,46 @@ Full rationale and enforcement: [docs/GIT-WORKFLOW.md](docs/GIT-WORKFLOW.md).
   - *Cloud session* (Claude Code on the web / a temporary container,
     `CLAUDE_CODE_REMOTE=true`): create `claude/<STEP-ID>-<slug>` (or
     `claude/<slug>` when not working on a step) from `development`.
+  - *Creating it.* A fresh clone has `development` only as
+    `origin/development`, so branch from the remote-tracking ref:
+    `git fetch origin development:refs/remotes/origin/development && git switch -c <branch> --no-track origin/development`.
+    If the fetch fails, stop and tell the user that `development` does not
+    exist yet (README step 1); do not fall back to `main`.
 - **Pushing.** Never push unless the user explicitly asked for that push in
   the current conversation. Approval covers that one request, not later ones.
   When asked, push with `AGENT_PUSH_APPROVED=1 git push …` so the pre-push hook
   lets it through. *Exception:* in a cloud session you may push the
-  `claude/*` branches you created, without asking.
+  `claude/*` branches you created, without asking, as long as the push only
+  creates or fast-forwards the branch. A force-push or a branch deletion
+  needs an explicit request like any other push. Push branches only, never
+  tags.
 - **Commit messages.**
   - Short: subject ≤ 72 characters, imperative mood; a body only when the
     *why* is not obvious.
-  - Never refer to the agent or tooling: no "Claude", "AI", "agent",
-    "assistant", no `Co-Authored-By:` trailer, no "Generated with" lines, no
-    emoji signatures. Write it as the engineer would.
+  - Never refer to the agent or tooling: no tool or vendor names (Claude,
+    Anthropic, OpenAI, ChatGPT, Copilot, Gemini, Codex, Cursor), no "AI",
+    "LLM", "GPT", "agent", "assistant", no `Co-Authored-By:` or session
+    trailer, no "Generated with/by" lines, no emoji signatures. Write it as
+    the engineer would. The `commit-msg` hook enforces the subset in
+    `FORBIDDEN_MSG_RE` (`.githooks/_agent.sh`); "assistant" and "Cursor" are
+    ordinary words in many codebases and are left out of the pattern, not out
+    of the rule. File names (`AGENTS.md`, `CLAUDE.md`, `.claude/…`), `claude/*`
+    branch names and REQ/STEP ids may be mentioned.
   - Prefixes per [REQUIREMENTS-MANAGEMENT.md](REQUIREMENTS-MANAGEMENT.md) §4.2:
     `[STEP-<ID>] subject` for step work, `[Mx] …` for milestone records,
-    `[plan] …` for ARCHITECTURE / plan edits.
+    `[plan] …` for ARCHITECTURE / plan edits, `[REQ] …` for
+    requirement-only edits.
 - **Never bypass hooks** (`--no-verify`, changing `core.hooksPath`). If a hook
   blocks you, stop and tell the user why.
-- Tags, releases, and PR merges are the user's.
+- Tags, releases, and PR merges are the user's. Open a PR only when the user
+  asks; never merge, approve or enable auto-merge.
 
-**Non-Claude tools:** export `AGENT_SESSION=1` in the agent's shell so the git
-hooks recognise it (Claude Code is detected automatically via `CLAUDECODE=1`).
-Run `scripts/setup.sh` (or `scripts/setup.ps1`) once per clone if hooks are not
+**Agent detection.** The git hooks recognise Claude Code (`CLAUDECODE=1`) and
+Gemini CLI (`GEMINI_CLI=1`) from the variables those tools set for the
+commands they run. Other tools (Codex, Copilot, Cursor, …) are not detected
+on their own: the person configuring the tool sets `AGENT_SESSION=1` in the
+tool's environment (README step 2 shows how to verify it). Run
+`scripts/setup.sh` (or `scripts/setup.ps1`) once per clone if hooks are not
 active (`git config --get core.hooksPath` should print `.githooks`).
 
 ## 2. Process

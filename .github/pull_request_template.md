@@ -19,5 +19,7 @@
 - [ ] Tests pass locally (`./dev ci`)
 - [ ] `implements:` / `verifies:` tags added where load-bearing
 - [ ] Step files: evidence filled, Definition of done checked
-- [ ] `requirements/TRACE.md` regenerated
+- [ ] `requirements/TRACE.md` regenerated (`./dev trace`)
 - [ ] ARCHITECTURE.md / KNOWN-ISSUES.md / docs updated if affected
+- [ ] No changes to enforcement files (`.githooks/`, `scripts/setup.*`,
+      `scripts/test-hooks.sh`, `.github/workflows/`), or reviewed line by line

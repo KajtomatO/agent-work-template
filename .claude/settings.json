@@ -2,32 +2,77 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "attribution": {
     "commit": "",
-    "pr": ""
+    "pr": "",
+    "sessionUrl": false
   },
-  "includeCoAuthoredBy": false,
   "permissions": {
     "ask": [
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "mcp__*__create_pull_request",
+      "Edit(/.githooks/**)",
+      "Edit(/scripts/setup.sh)",
+      "Edit(/scripts/setup.ps1)",
+      "Edit(/scripts/test-hooks.sh)",
+      "Edit(/.github/workflows/**)"
     ],
     "deny": [
       "Bash(git commit --no-verify:*)",
       "Bash(git commit * --no-verify*)",
       "Bash(git commit -n:*)",
+      "Bash(git commit -n*)",
+      "Bash(git commit * -n)",
+      "Bash(git commit * -n *)",
       "Bash(git merge --no-verify:*)",
       "Bash(git merge * --no-verify*)",
       "Bash(git push --no-verify:*)",
       "Bash(git push * --no-verify*)",
+      "Bash(git * --no-verify*)",
       "Bash(git config core.hooksPath:*)",
-      "Bash(git config --unset core.hooksPath:*)"
+      "Bash(git config core.hooksPath*)",
+      "Bash(git config --local core.hooksPath*)",
+      "Bash(git config --global core.hooksPath*)",
+      "Bash(git config --unset core.hooksPath:*)",
+      "Bash(git config --unset core.hooksPath*)",
+      "Bash(git -c *)",
+      "Bash(git -C *)",
+      "Bash(env -u CLAUDECODE*)",
+      "Bash(env -u AGENT_SESSION*)",
+      "Bash(env -i *)",
+      "Bash(unset CLAUDECODE*)",
+      "Bash(unset AGENT_SESSION*)",
+      "Bash(export CLAUDE_CODE_REMOTE*)",
+      "Bash(export AGENT_PUSH_APPROVED*)",
+      "Bash(gh pr merge:*)",
+      "mcp__*__push_files",
+      "mcp__*__create_or_update_file",
+      "mcp__*__delete_file",
+      "mcp__*__merge_pull_request",
+      "mcp__*__enable_pr_auto_merge",
+      "Read(./.env)",
+      "Read(./*.local.env)"
     ]
   },
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "startup|resume",
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/scripts/setup.sh\""
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/scripts/setup.sh\""
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push *)",
+            "command": "[ \"$CLAUDE_CODE_REMOTE\" = true ] && ! grep -q AGENT_PUSH_APPROVED && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}'; exit 0"
           }
         ]
       }

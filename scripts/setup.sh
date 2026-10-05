@@ -8,6 +8,7 @@ root=$(git rev-parse --show-toplevel)
 cd "$root"
 
 git config core.hooksPath .githooks
-chmod +x .githooks/* dev scripts/*.sh 2>/dev/null || true
+# Not `.githooks/*`: _agent.sh is sourced, never executed, and tracked as 644.
+chmod +x .githooks/[!_]* dev scripts/*.sh 2>/dev/null || true
 
 echo "setup: git hooks enabled (core.hooksPath=.githooks)"

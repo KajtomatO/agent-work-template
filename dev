@@ -14,12 +14,29 @@ log()  { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 run()  { printf '\033[2m$ %s\033[0m\n' "$*" >&2; "$@"; }   # echo, then execute
-todo() { die "'$1' is not configured yet — edit ./dev (SETUP)"; }
+todo() { die "'$1' is not configured yet: fill in its command in ./dev"; }
 
-# Local, git-ignored settings and secrets (see .env.example).
+# Local, git-ignored settings and secrets (see .env.example). Parsed as plain
+# KEY=value lines and never executed; dev.ps1 reads the same grammar.
+load_env() {
+    local line key value
+    local pair='^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$'
+    local dquoted='^"(.*)"$' squoted="^'(.*)'\$"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line=${line%$'\r'}
+        [[ "$line" =~ $pair ]] || continue
+        key=${BASH_REMATCH[1]}
+        value=${BASH_REMATCH[2]}
+        value=${value%"${value##*[![:space:]]}"}     # trailing whitespace
+        if [[ "$value" =~ $dquoted || "$value" =~ $squoted ]]; then
+            value=${BASH_REMATCH[1]}
+        fi
+        export "$key=$value"
+    done < "$1"
+}
 if [[ -f "$ROOT/.env" ]]; then
     log "loading .env"
-    set -a; source "$ROOT/.env"; set +a
+    load_env "$ROOT/.env"
 fi
 
 cmd_setup() {
@@ -40,12 +57,18 @@ cmd_test() {
 }
 
 cmd_check() {
+    run sh scripts/check-setup.sh                # template markers all filled in
     todo check                                   # lint, format check, doc gates
+}
+
+cmd_trace() {
+    run python3 scripts/trace.py "$@"            # REQUIREMENTS-MANAGEMENT.md §4.3
 }
 
 cmd_ci() {
     # Local mirror of CI: same steps, same order.
     run sh scripts/test-hooks.sh
+    run python3 scripts/trace.py --check
     cmd_build
     cmd_check
     cmd_test unit
@@ -59,6 +82,9 @@ usage: ./dev <command> [args]
   build                  build the project
   test [tier]            run tests: unit (default) | integration | disruptive | all
   check                  static checks: lint, formatting, documentation gates
+  trace [--coverage|--check]
+                         regenerate requirements/TRACE.md, report only, or
+                         fail if it is stale (needs python3)
   ci                     run what CI runs, locally
   help                   this text
 
@@ -69,7 +95,7 @@ EOF
 cmd=${1:-help}
 shift || true
 case "$cmd" in
-    setup|build|test|check|ci|help) "cmd_$cmd" "$@" ;;
+    setup|build|test|check|trace|ci|help) "cmd_$cmd" "$@" ;;
     -h|--help) cmd_help ;;
     *) cmd_help; die "unknown command '$cmd'" ;;
 esac

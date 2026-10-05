@@ -84,10 +84,11 @@ criterion independently checkable).
 | Transition | Who | Precondition |
 |---|---|---|
 | draft → approved | human only | — |
-| approved → implemented | agent, during §4.3 only | ≥ 1 `implements:` tag in the code root **and** every step whose `implements` lists this REQ is in `done/` |
-| implemented → verified | agent, during §4.3 only | ≥ 1 `verifies:` tagged test exists and the test suite passes |
-| any → needs-reverify | agent, during §6.2 only | impact-analysis report presented |
+| approved → implemented | agent, during §4.3 only | ≥ 1 `implements:` tag in a scanned code location (§4.2) **and** every non-cancelled step whose `implements` lists this REQ is in `done/` |
+| implemented → verified | agent, during §4.3 only | ≥ 1 `verifies:` tag in a scanned test location (§4.2) and the test suite passes |
+| any → needs-reverify | agent, during §6.2, or during §4.3 when evidence has disappeared (below) | impact-analysis report approved, or the gap flagged in the coverage report |
 | needs-reverify → implemented/verified | agent, during §4.3 | rework complete, evidence present again |
+| approved / implemented / verified → draft | whoever makes a meaning-changing edit (§3.3), during §6.2 step 5 | impact-analysis report approved |
 | any → superseded / rejected | human only | successor REQ referenced via `superseded_by` (for superseded) |
 
 If a scan shows evidence has *disappeared* (a tag was deleted, a test
@@ -104,8 +105,9 @@ flags the item loudly in the coverage report.
   with date, an `ARCHITECTURE.md` section, or an external source per §8.
 - **Non-duplicative**: a REQ never restates another; use `depends_on`.
 - **Edits**: any edit bumps `revision`; git history is the changelog. An edit
-  that changes the *meaning* of an approved REQ resets `status` to `draft`
-  (human must re-approve) and triggers the §6.2 procedure first. Typo and
+  that changes the *meaning* of an approved, implemented or verified REQ
+  triggers the §6.2 procedure first and then resets `status` to `draft`
+  (§3.2; a human must re-approve). Typo and
   rationale-only edits just bump `revision`.
 - **Supersede / split**: create the new REQ(s), set the old one to
   `superseded` with `superseded_by` filled. History is never rewritten.
@@ -115,8 +117,8 @@ flags the item loudly in the coverage report.
 ### 4.1 Link model
 
 ```
-ARCHITECTURE.md anchors ←declared— REQ —discovered→ code tags (code root)
-                                    │ —discovered→ test tags (test root)
+ARCHITECTURE.md anchors ←declared— REQ —discovered→ code tags (scanned code locations)
+                                    │ —discovered→ test tags (scanned test locations)
                                     │ —discovered→ steps (frontmatter `implements`)
                                     └─ declared → depends_on (other REQs)
 STEP —discovered→ commits (subject prefix "[STEP-…]")
@@ -126,11 +128,18 @@ STEP —discovered→ commits (subject prefix "[STEP-…]")
 
 <!-- SETUP: the code root defaults to `src/` and the test root to `tests/`.
      Extra scanned locations (build files, CI workflows, the `dev` script,
-     scripts/) are listed in "Also scanned". Adjust here; §4.3 reads this. -->
+     hooks, scripts/) are listed in "Also scanned". To change them, edit
+     the constants at the top of scripts/trace.py and mirror them here. -->
 
 - **Code root:** `src/`
 - **Test root:** `tests/`
-- **Also scanned for `implements:`:** `dev`, `dev.ps1`, `scripts/`, `.github/workflows/`
+- **Also scanned for `implements:`:** `dev`, `dev.ps1`, `scripts/`, `.github/workflows/`, `.githooks/`
+- **Also scanned for `verifies:` / `supports:`:** `scripts/`
+
+The code root and the first "also scanned" list are the *scanned code
+locations*; the test root and the second list are the *scanned test
+locations*. What is actually scanned is defined by the constants at the top
+of `scripts/trace.py`; this list mirrors them.
 
 | Where | Tag | Example |
 |---|---|---|
@@ -151,32 +160,56 @@ agent (AGENTS.md §1).
 
 ### 4.3 PROCEDURE: regenerate the trace matrix
 
+Steps 1–4 and 6 are mechanical and done by `scripts/trace.py` (Python 3,
+standard library only; `./dev trace` wraps it), so the result is reproducible.
+Steps 5 and 7 need judgment and stay with whoever runs the procedure.
+
+`python3 scripts/trace.py --coverage` performs steps 1–4 and prints the
+coverage report, every tag as `file:line`, and the status transitions the
+evidence supports:
+
 1. Enumerate `requirements/REQ-*.md`; parse frontmatter.
 2. Enumerate `workplan/{todo,doing,done}/STEP-*.md`; parse `id`,
-   `implements`, `cancelled`, and note which folder each is in.
-3. Grep the code root and "also scanned" locations (§4.2) for
-   `implements: REQ-` and the test root for `verifies: REQ-` /
-   `supports: REQ-`; collect `file:line` per REQ. (Absent directories →
-   empty sets, not an error.)
+   `implements`, `cancelled`, `evidence`, and note which folder each is in.
+3. Grep the scanned code locations (§4.2) for `implements: REQ-` and the
+   scanned test locations for `verifies: REQ-` / `supports: REQ-`; collect
+   `file:line` per REQ. (Absent directories → empty sets, not an error.)
 4. Check every declared architecture anchor resolves to a heading in
    `ARCHITECTURE.md`.
-5. Apply status transitions per §3.2 (only the ones marked "during §4.3");
-   edit the affected REQ files.
-6. Overwrite `requirements/TRACE.md`: generation stamp (date, branch, short
-   HEAD SHA, one-paragraph summary of what changed since the previous stamp;
-   keep only the **last 5** stamps), the scan inputs, the matrix
-   (REQ | title | status | priority | architecture | steps | code | tests),
-   then the coverage report:
-   - approved REQs with no code tag (unimplemented)
-   - implemented REQs with no passing tagged test (unverified)
-   - orphan tags (tags naming a nonexistent REQ)
-   - steps in `done/` with empty `evidence` (rule violation)
-   - broken architecture anchors
-   - REQs in `needs-reverify`
+
+Then:
+
+5. Apply status transitions per §3.2 (only the ones marked "during §4.3"):
+   edit `status` in the affected REQ files and bump `revision`. The script
+   proposes transitions, it never edits a REQ. Promote to `verified` only
+   after the test suite has passed.
+6. Run `python3 scripts/trace.py` to overwrite `requirements/TRACE.md`. The
+   file has four fixed sections:
+   - **Generation stamp** — one line: the date and the computed change since
+     the previous matrix (e.g. `REQ-BUILD-002 approved->implemented; +1 REQ`).
+     No branch, SHA or history. The file is rewritten only when the scan
+     result changed.
+   - **Scan inputs** — the scanned locations.
+   - **Matrix** — REQ | title | status | priority | architecture | steps |
+     code | tests. Code and tests are listed as files, without line numbers,
+     so an unrelated edit above a tag does not make the matrix stale.
+   - **Coverage report**:
+     - approved REQs with no code tag (unimplemented)
+     - implemented REQs with no tagged test (unverified)
+     - implemented or verified REQs whose tag is gone (evidence missing)
+     - orphan tags (tags naming a nonexistent REQ)
+     - steps in `done/` with empty `evidence` (rule violation)
+     - broken architecture anchors
+     - REQs in `needs-reverify`
 7. Report the summary in chat.
 
-**Read-only variant** ("coverage check"): steps 1–4 + report only; no files
-written, no status changes.
+`python3 scripts/trace.py --check` exits 1 when `TRACE.md` no longer matches
+a fresh scan (the stamp is not compared); CI runs it. When two branches both
+regenerated the file and it conflicts in a merge, take either side and run
+step 6 again.
+
+**Read-only variant** ("coverage check"): steps 1–4 + report only
+(`--coverage`); no files written, no status changes.
 
 ## 5. Implementation work (workplan)
 
@@ -205,7 +238,9 @@ that demonstrates the milestone's Gate criterion from ARCHITECTURE.md.
 
 - **`todo/`** — approved, not started. Files here may be freely edited or
   renumbered as understanding improves.
-- **`doing/`** — in progress. WIP limit: at most **2** steps in `doing/`.
+- **`doing/`** — in progress. WIP limit: at most **2** steps in `doing/`,
+  counted on the integration view: `development` plus every open work
+  branch, not only the branch at hand.
 - **`done/`** — complete. A step may enter `done/` only when every
   Definition-of-done box is checked, `evidence.commits` is non-empty, and
   `evidence.tests` lists passing tags (or `evidence.notes` states why the
@@ -238,7 +273,8 @@ time.
 4. On human approval: on a work branch (AGENTS.md §1), create the step files
    in `todo/` from the template, one commit (`[Mx] decomposition`).
 5. On the *first* decomposition also create one coarse placeholder step per
-   remaining future milestone (`STEP-<My>-000-<slug>.md` in `todo/`). When a
+   remaining future milestone (`STEP-<My>-000-<slug>.md` in `todo/`, with
+   `implements: []` so it never counts towards a REQ's coverage). When a
    milestone's turn comes, its placeholder is cancelled (§5.2) and replaced
    by the detailed steps.
 6. Regenerate the trace matrix (§4.3).
@@ -246,11 +282,24 @@ time.
 ### 5.4 PROCEDURE: implement a step
 
 1. Preconditions: the step is in `todo/`, everything in its `depends_on` is
-   in `done/`, WIP limit not exceeded, not `cancelled`.
+   in `done/`, WIP limit not exceeded (§5.2; after a fetch,
+   `git ls-tree -r --name-only origin/<branch> workplan/doing/` lists another
+   branch's steps in progress), not `cancelled`.
 2. Select the work branch per AGENTS.md §1 — never `main` or `development`:
    - cloud session: create `claude/<STEP-ID>-<slug>` from `development`;
    - local: the current branch if it is not protected, otherwise **ask the
      user** for a branch name and create it from `development`.
+
+   A fresh clone has `development` only as `origin/development`, so create
+   the branch from the remote-tracking ref:
+
+   ```sh
+   git fetch origin development:refs/remotes/origin/development && \
+   git switch -c <branch> --no-track origin/development
+   ```
+
+   If the fetch fails, stop and tell the user that `development` (README
+   step 1) does not exist yet; do not fall back to `main`.
 3. `git mv` the file to `doing/`; commit `[STEP-<ID>] start`.
 4. Implement. Tag code `implements:` for each REQ in the step's
    `implements`; prefix every commit subject with `[STEP-<ID>]`.
@@ -291,11 +340,13 @@ in that case it stops and runs this first.**
 3. Produce the report: per affected item — what changed, why it is affected,
    proposed action (rework / re-verify / no action, with reason).
 4. **Stop.** A human approves the report, possibly trimmed.
-5. Apply the approved consequences: set affected REQs to `needs-reverify`
-   (bumping `revision`); reopen affected `done/` steps per §5.2 or create
-   new steps; make the underlying edit itself.
-6. After rework and passing tests, the next §4.3 run restores statuses;
-   report closure in chat.
+5. Apply the approved consequences: make the underlying edit itself (an
+   edited REQ goes to `draft`, §3.3); set the other affected REQs to
+   `needs-reverify`; bump `revision` on each; reopen affected `done/` steps
+   per §5.2 or create new steps.
+6. After rework and passing tests, the next §4.3 run restores the
+   `needs-reverify` statuses; an edited REQ stays `draft` until a human
+   re-approves it. Report closure in chat.
 
 ## 7. Drafting requirements (brief)
 
@@ -335,7 +386,8 @@ the agent SHOULD propose capturing it as a REQ on the spot.
 - **Uncertainty is propagated, not resolved by fiat.** Open questions stay
   visible as open acceptance criteria until actually verified.
 - **Generated files are disposable.** `TRACE.md` must always be
-  reproducible from a fresh scan; if it can't be, the scan wins.
+  reproducible from a fresh scan (`scripts/trace.py --check`); if it can't
+  be, the scan wins.
 
 ## Appendix A: standing commands
 
@@ -351,3 +403,6 @@ Any agent can be asked in these words; in Claude Code they are also skills
 | "start step \<STEP-ID\>" | `/step-start` | §5.4 steps 1–3 |
 | "complete step \<STEP-ID\>" | `/step-complete` | §5.4 steps 5–9 |
 | "impact analysis for \<REQ-ID / section\>" | `/impact-analysis` | §6.2 |
+
+`/step-start` and `/step-complete` run only when the user invokes them: an
+agent does not start or close a step on its own initiative.
