@@ -2,6 +2,7 @@
 name: step-complete
 description: Complete a workplan step — run tests, fill evidence, check the definition of done, move to done/, regenerate the trace matrix (REQUIREMENTS-MANAGEMENT.md §5.4 steps 5–9).
 argument-hint: <STEP-ID>
+disable-model-invocation: true
 ---
 
 Execute REQUIREMENTS-MANAGEMENT.md §5.4 steps 5–9 for: $ARGUMENTS

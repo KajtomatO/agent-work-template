@@ -1,0 +1,13 @@
+#!/bin/sh
+# Agents may not rebase protected branches.
+# $1 = upstream, $2 = branch being rebased (unset when it is the current one).
+. "$(dirname "$0")/_agent.sh"
+
+is_agent || exit 0
+
+branch=${2:-$(current_branch)}
+branch=${branch#refs/heads/}
+if is_protected "$branch"; then
+    deny "agent rebases of '$branch' are not allowed. Work on another branch."
+fi
+exit 0

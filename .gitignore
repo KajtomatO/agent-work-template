@@ -2,6 +2,7 @@
 .env
 *.local.env
 .claude/settings.local.json
+CLAUDE.local.md
 
 # Scratch
 tmp/

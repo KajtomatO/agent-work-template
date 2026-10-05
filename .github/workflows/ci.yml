@@ -1,32 +1,64 @@
 # implements: REQ-BUILD-001, REQ-BUILD-002
-# Keep in sync with `./dev ci` (the local mirror of this workflow).
+# Keep in sync with `./dev ci` (the local mirror of this workflow). The
+# `windows` job is platform coverage for the PowerShell files and is not
+# mirrored there.
 name: ci
 
+# Work branches are checked once their pull request exists.
 on:
   push:
+    branches: [main, development]
   pull_request:
   workflow_dispatch:
 
+# The jobs run whatever a pull request's branch contains: the token gets
+# read access to the repository and nothing else.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Only superseded runs of a work branch are cancelled; every commit on the
+  # long-lived branches keeps its result.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/development' }}
 
 jobs:
   hooks:
     name: git hooks self-test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: sh scripts/test-hooks.sh
+      - run: python3 scripts/trace.py --check
+
+  windows:
+    name: windows smoke test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: ./dev.ps1 help
+        shell: pwsh
+      - run: ./dev.ps1 setup
+        shell: pwsh
+      - run: sh scripts/test-hooks.sh
+        shell: bash
 
   build-test:
     name: build & unit tests
-    # SETUP: remove this condition once ./dev build/check/test are configured,
-    # and add an OS/toolchain matrix as needed.
+    # SETUP: this job is skipped until the repository variable DEV_CONFIGURED
+    # is 'true' (Settings > Secrets and variables > Actions > Variables), so a
+    # fresh template stays green while ./dev build/check/test are still
+    # unconfigured. Set the variable once they work, then delete the `if:`
+    # line: a skipped job reports success and satisfies a required check.
+    # Add an OS/toolchain matrix as needed.
     if: ${{ vars.DEV_CONFIGURED == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # SETUP: toolchain / dependency installation steps go here.
       - run: ./dev build
       - run: ./dev check
