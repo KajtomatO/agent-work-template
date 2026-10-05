@@ -1,16 +1,24 @@
 #!/bin/sh
 # Agent pushes:
+#   - only branches (tags and other refs are the user's);
 #   - never to a protected branch (any session, any approval);
 #   - otherwise only when the user explicitly asked (AGENT_PUSH_APPROVED=1),
-#     or in a cloud session for branches the agent created (CLOUD_BRANCH_PREFIX).
+#     or in a cloud session to create or fast-forward a CLOUD_BRANCH_PREFIX branch.
 . "$(dirname "$0")/_agent.sh"
 
 is_agent || exit 0
 
+# All-zero object id (any hash length): the ref does not exist on that side.
+is_zero() {
+    case "$1" in *[!0]*) return 1 ;; esac
+    return 0
+}
+
+# shellcheck disable=SC2034  # local_ref is part of git's input format
 while read -r local_ref local_sha remote_ref remote_sha; do
     case "$remote_ref" in
         refs/heads/*) name=${remote_ref#refs/heads/} ;;
-        *)            name=$remote_ref ;;
+        *) deny "agents may only push branches ('$remote_ref' refused); tags are the user's." ;;
     esac
 
     if is_protected "$name"; then
@@ -21,7 +29,16 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 
     if is_cloud; then
         case "$remote_ref" in
-            "refs/heads/$CLOUD_BRANCH_PREFIX"*) continue ;;
+            "refs/heads/$CLOUD_BRANCH_PREFIX"*)
+                # Unasked cloud pushes may only create or fast-forward a branch;
+                # rewriting or deleting one (possibly another session's) needs approval.
+                if is_zero "$local_sha"; then
+                    deny "cloud session: deleting '$name' needs AGENT_PUSH_APPROVED=1."
+                fi
+                if ! is_zero "$remote_sha" && ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+                    deny "cloud session: force-updating '$name' needs AGENT_PUSH_APPROVED=1."
+                fi
+                continue ;;
         esac
         deny "cloud session: agents may only push '$CLOUD_BRANCH_PREFIX*' branches ('$name' refused)."
     fi

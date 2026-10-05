@@ -23,6 +23,9 @@ choices, and where it stands (current milestone).>
 - **Branching:** `main` (releases) ← `development` (integration) ← work
   branches; agents never commit to or push `main`/`development`
   ([docs/GIT-WORKFLOW.md](docs/GIT-WORKFLOW.md)). (template default)
+- **Task runner:** `./dev` (`dev.ps1` on Windows) is the one entry point for
+  build, test and checks, and its `ci` command mirrors the CI workflow.
+  (template default)
 
 ## 2. Context & constraints
 
@@ -75,7 +78,8 @@ workplan/       steps: todo/ doing/ done/
 
 <!-- Format: one bullet per milestone with a demonstrable **Gate**. Later
      additions are appended in italics with the decision date. The first
-     decomposition (§5.3) creates STEP-<Mx>-000 placeholders for the rest. -->
+     decomposition (REQUIREMENTS-MANAGEMENT.md §5.3) creates STEP-<Mx>-000
+     placeholders for the rest. -->
 
 - **M1 — <name> (MVP):** <scope>. **Gate:** <demonstrable criterion>.
 - **M2 — <name>:** <scope>. **Gate:** <demonstrable criterion>.

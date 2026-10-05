@@ -3,6 +3,7 @@
 | Document | Purpose |
 |---|---|
 | [GIT-WORKFLOW.md](GIT-WORKFLOW.md) | Branch model, agent git rules, enforcement, server-side protection |
+| [TEMPLATE-UPDATES.md](TEMPLATE-UPDATES.md) | Carrying later template fixes into a project created from it |
 | [../ARCHITECTURE.md](../ARCHITECTURE.md) | What is built |
 | [../REQUIREMENTS-MANAGEMENT.md](../REQUIREMENTS-MANAGEMENT.md) | How work is tracked |
 | [../KNOWN-ISSUES.md](../KNOWN-ISSUES.md) | Open defects and workarounds |

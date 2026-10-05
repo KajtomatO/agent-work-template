@@ -3,13 +3,13 @@ id: REQ-BUILD-001
 title: Developer task runner mirrors CI
 status: draft
 priority: should
-revision: 1
-source: template default (agent-work-template)
+revision: 2
+source: ARCHITECTURE.md §1 (Task runner)
 depends_on: []
 supersedes: null
 superseded_by: null
 traces:
-  architecture: ["ARCHITECTURE.md#5-testing-policy"]
+  architecture: ["ARCHITECTURE.md#1-decisions-fixed", "ARCHITECTURE.md#5-testing-policy"]
 ---
 
 # Developer task runner mirrors CI
@@ -24,6 +24,8 @@ command it executes so the plain commands remain discoverable.
 
 **Acceptance criteria:**
 - [ ] `./dev help` and `./dev.ps1 help` list `setup`, `build`, `test`, `check`, `ci`.
-- [ ] `./dev ci` runs the same steps as `.github/workflows/ci.yml`.
+- [ ] `./dev ci` runs the same steps, in the same order, as the `hooks` job
+      of `.github/workflows/ci.yml` followed by its `build-test` job once
+      that job is enabled (repository variable `DEV_CONFIGURED`).
 - [ ] Each executed command is echoed before it runs; exit codes propagate.
 - [ ] A git-ignored `.env` is loaded when present.

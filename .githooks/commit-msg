@@ -4,18 +4,35 @@
 
 is_agent || exit 0
 
-# Message as git will store it: drop the verbose-diff part and comment lines.
-msg=$(sed -e '/^# -\{24\} >8 -\{24\}/,$d' -e '/^#/d' "$1")
+# The message is handled as bytes, so the result does not depend on the
+# locale or on how a platform's grep and sed treat multibyte characters.
+LC_ALL=C
+export LC_ALL
+
+# Message as git will store it: drop the verbose-diff part (the scissors line,
+# whatever the comment character) and let git strip the comment lines.
+msg=$(sed '/^[^[:space:]]* -\{24\} >8 -\{24\}/,$d' "$1" | git stripspace --strip-comments)
 subject=$(printf '%s\n' "$msg" | sed -n '/[^[:space:]]/{p;q;}')
 
 [ -n "$subject" ] || deny "empty commit message."
 
-len=$(printf '%s' "$subject" | wc -m | tr -d ' ')
-if [ "$len" -gt "$MAX_SUBJECT_LEN" ]; then
-    deny "subject is $len characters; keep it at most $MAX_SUBJECT_LEN."
-fi
+case "$subject" in
+    'fixup! '*|'squash! '*|'amend! '*)
+        # The subject repeats another commit's subject verbatim and disappears
+        # at autosquash: check only the body (line numbers kept).
+        scan=$(printf '%s\n' "$msg" | awk 'NR == 1 { print ""; next } { print }')
+        ;;
+    *)
+        len=$(printf '%s' "$subject" | char_count)
+        if [ "$len" -gt "$MAX_SUBJECT_LEN" ]; then
+            deny "subject is $len characters; keep it at most $MAX_SUBJECT_LEN."
+        fi
+        scan=$msg
+        ;;
+esac
 
-hit=$(printf '%s\n' "$msg" | grep -inE "$FORBIDDEN_MSG_RE" | head -n 1)
+scan=$(printf '%s\n' "$scan" | sed -E "s#$ALLOWED_MSG_RE##g")
+hit=$(printf '%s\n' "$scan" | grep -inE "$FORBIDDEN_MSG_RE" | head -n 1)
 if [ -n "$hit" ]; then
     deny "commit message must not refer to the agent or tooling (line $hit)."
 fi
